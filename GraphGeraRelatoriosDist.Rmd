@@ -1,0 +1,468 @@
+---
+title: "Relatorio KPIs Qion"
+date: "5 Agosto 2015"
+output:
+  pdf_document:
+    includes:
+      in_header: header.tex
+documentclass: article
+classoption: a4paper
+---
+
+```{r setup, include=FALSE}
+
+# Esse arquivo ? o PDF a ser impresso. Tem tipo A4.
+#O header esta la para adicionar algumas bibliotecas e o papel timbrado no fundo de todas as paginas
+
+#inicializa bibliotecas e opcoes
+library(knitr)
+library(ggplot2)
+library(gridExtra)
+library(reshape)
+library(xtable)
+library(SGP)
+library(stringr)
+
+options(xtable.comment = FALSE)
+opts_chunk$set(dev = 'pdf')
+```
+#Volume do Canal no CY 14/15:
+```{r, echo=FALSE,warning=FALSE, message=FALSE,cache.comments=FALSE, results = "asis", message=FALSE, comment=NA}
+#Volume do Canal no CY mais recente em forma de tabela. Nao muito mais que isso.
+Volume = aggregate(list(qion15$QT_ITEMS), 
+                      by=list(qion15$PRODUTO), FUN = sum)
+names(Volume)[1] = "Produto"
+names(Volume)[2] = "Volume (Sacos)"
+
+Volume = subset(Volume, Volume$"Volume (Sacos)">0)
+
+Volume = Volume[order(-Volume$"Volume (Sacos)"),]
+Volume$"Volume (Sacos)" = round(Volume$"Volume (Sacos)")
+
+tabela = xtable(Volume,include.rownames=FALSE,digits =0)
+
+align(tabela) <- "|c|c|c|"
+
+print ((tabela),include.rownames=FALSE)
+
+```
+\pagebreak
+
+#Premissas do gr?fico de Reten??o:
+
+1. Milho e sorgo
+2. Opera??es de Venda, Devolu??o e Bonifica??o
+3. Considerado como cliente ?nico Nome+CPF
+4. Todos os clientes, independente da cidade
+5. Minimo de 5 sacos para ser considerado na an?lise
+6. Porcentagem para gr?fico de pizza calculado como: Clientes presentes em ambos CYs / Clientes Totais CY 13/14
+7. Com e sem clientes Mon 1:1 (ainda n?o implementado)
+
+```{r, echo=FALSE,warning=FALSE, message=FALSE,cache.comments=FALSE}
+
+#Imprime os dois graficos de reten?ao. 
+#Um grafico de pizza (urg) com o % retido e outro com numeros absolutos
+#Para isso precisa fazer esse malabarismo de Retencao1 (numeros absolutos) e Retencao2(pizza)
+Retencao$Totais = as.numeric(as.character(Retencao$Totais))
+Retencao1 = subset(Retencao, Row.Names != "Total 14/15")
+Retencao1$Graph = c("CY 13/14","CY 14/15","CY 14/15")
+Retencao2 = subset(Retencao, Row.Names == "Retido")
+
+Retencao2$Totais = as.numeric(as.character(Retencao2$Totais))
+Retencao2$Row.Names = (as.character(Retencao2$Row.Names))
+
+Retencao2 = rbind.data.frame(Retencao2, c("Nao Retido",
+            (as.numeric(as.character(Retencao[1,2]))-as.numeric(as.character(Retencao[3,2]))))
+)
+Retencao2$Row.Names = as.character(Retencao2$Row.Names)
+Retencao2$Totais = as.numeric(as.character(Retencao2$Totais))
+Retencao2$Pct = 100*Retencao2$Totais/sum(Retencao2$Totais)
+Retencao1$Totais = as.numeric(as.character(Retencao1$Totais))
+Retencao1$Acc = c(Retencao1$Totais[1],Retencao1$Totais[2],Retencao1$Totais[2]+Retencao1$Totais[3])
+
+p1 = ggplot(Retencao1, aes(x = Graph, y = as.numeric(as.character(Totais)), fill = Row.Names)) +
+  geom_bar(stat="identity", colour = "black") +
+  labs(fill="")+
+  xlab("Crop Year")+
+  ylab("Agricultores") + 
+  theme_bw()+
+  geom_text(aes(label = as.numeric(as.character(Totais)), y = (Acc)-0.5*Totais), size = 5,face = "bold")+
+  ggtitle("Reten??o 13/14 -> 14/15") + 
+  theme(plot.margin = unit(c(3, 1, 12, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 0, vjust = 0, size = 12),
+        plot.title = element_text(face = "bold", vjust = 1),
+        axis.line = element_line(colour = "black"),
+        axis.text = element_text(colour = "black"),
+        legend.position = "top",
+        legend.text = element_text(size=8)) 
+                              
+p2 = ggplot(Retencao2, aes(x = "", y = Pct, fill = Row.Names)) +
+  geom_bar(stat="identity", colour = "black") +
+  labs(fill="")+
+  ylab("Porcentagem") + 
+  theme_bw()+
+  geom_text(aes(label = paste(round(as.numeric(as.character(Pct))),"%",sep="")
+                ,y=cumsum(Pct)-0.5*Pct),size = 5,face = "bold")+
+  ggtitle("Reten??o (%)") + 
+  coord_polar("y", start=0)+
+  theme(plot.margin = unit(c(3, 1, 12, 1),units="points"),
+        axis.title.y = element_blank(),
+        axis.title.x = element_text(angle = 0,face = "bold.italic", size = 12),
+        axis.text.x=element_blank(),
+        plot.title = element_text(face = "bold", vjust = 1),
+        axis.line = element_line(colour = "black"),
+        axis.text = element_text(colour = "black"),
+        legend.position = "top",
+        legend.text = element_text(size=8)) 
+
+grid.arrange(p1, p2, ncol=2)
+
+
+```
+
+\pagebreak
+
+#Premissas do gr?fico de ref?gio
+
+1. Apenas milho
+2. Opera??es de Venda, Devolu??o e Bonifica??o
+3. Considerado como cliente ?nico Nome+CPF
+4. Todos os clientes, independente da cidade
+5. Produtos BT: tecnologia YG, PRO, PRO2 e PRO3
+6. Regras de compliance conforme programa (diferentes faixas)
+
+
+```{r, echo=FALSE,warning=FALSE, message=FALSE,cache.comments=FALSE, results = "asis", message=FALSE, comment=NA}
+
+#Coloca dois anos de refugio lado a lado
+
+refugio14_agregado = aggregate((list(refugio14$Client)), 
+                      by=list(refugio14$Compliance), FUN = length)
+names(refugio14_agregado)[2] = "Status"
+
+refugio15_agregado = aggregate((list(refugio15$Client)), 
+                      by=list(refugio15$Compliance), FUN = length)
+names(refugio15_agregado)[2] = "Status"
+
+p1 = ggplot(refugio14_agregado, aes(x = Group.1, y = Status)) + 
+  geom_bar(stat="identity", colour = "black", fill="#3366FF") +
+  xlab("Compliance")+
+  ylab("Agricultores") + 
+  theme_bw()+
+  geom_text(aes(label = round(Status)), vjust=-0.8,size = 2.7)+
+  ylim(0, 1.05*max(refugio14_agregado$Status,refugio15_agregado$Status))+
+  ggtitle("Refugio CY 14/15") + 
+  theme(plot.margin = unit(c(3, 1, 12, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x = element_text(angle = 0,face = "bold.italic", size = 12),
+        axis.text.x = element_text(angle = 0, vjust = 0, size = 12),
+        plot.title = element_text(size = rel(1.3),face = "bold", vjust = 1),
+        axis.line = element_line(colour = "black"),
+        axis.text = element_text(colour = "black")) 
+
+p2 = ggplot(refugio15_agregado, aes(x = Group.1, y = Status)) + 
+  geom_bar(stat="identity", colour = "black", fill="#3366FF") +
+  xlab("Compliance")+
+  ylab("Agricultores") + 
+  theme_bw()+
+  geom_text(aes(label = round(Status)), vjust=-0.8,size = 2.7)+
+  ylim(0, 1.05*max(refugio14_agregado$Status,refugio15_agregado$Status))+
+  ggtitle("Refugio CY 15/16") + 
+  theme(plot.margin = unit(c(3, 1, 12, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x = element_text(angle = 0,face = "bold.italic", size = 12),
+        axis.text.x = element_text(angle = 0, vjust = 0, size = 12),
+        plot.title = element_text(size = rel(1.3),face = "bold", vjust = 1),
+        axis.line = element_line(colour = "black"),
+        axis.text = element_text(colour = "black")
+        ) 
+
+grid.arrange(p1, p2, ncol=2)
+
+
+```
+\pagebreak
+
+#Premissas do grafico de Clientes:
+
+1. Consideradas opera??es de Vendas, Devolu??o e Bonifica??o
+2. Todas as cidades, independente da regional e distrito
+3. Dois gr?ficos, o primeiro com sorgo e milho e o segundo com apenas milho
+4. Foi considerado cliente ?nico CPF/CNPJ + Nome (pode aparecer o mesmo nome v?rias vezes se o CPF/CNPJ for diferente)
+
+
+```{r, echo=FALSE,warning=FALSE, message=FALSE,cache.comments=FALSE}
+
+#Mostra os vinte clientes de maior volume e quanto eles representam em %acumulado
+head_Clientes = head(Clientes15,20)
+Clientes = head_Clientes
+Clientes$Agricultor = paste(substring(Clientes$Agricultor,1,10),  "...",sep="")
+
+#Como o ggplot2 nao deixa fazer graficos de 2 eixos (devido a distor??o), 
+#? feito dessa forma, para mostra informa??o de forma parecida
+
+p1 = ggplot(Clientes, aes(x=1:nrow(Clientes), y = (Volume))) +
+  scale_x_discrete(labels=Clientes$Agricultor, breaks=1:nrow(Clientes),limits=1:nrow(Clientes))+
+  geom_bar(stat="identity", colour = "black", fill="#3366FF") +
+  ylab("Sacos") + 
+  theme_bw()+
+  ylim(0, 1.2*max(Clientes$Volume))+
+  ggtitle("Principais Clientes Sementes - Todas") + 
+  theme(plot.margin = unit(c(10, 1, -10, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x=element_blank(),
+        plot.title = element_text(size = rel(1.5), face = "bold", vjust = 2),
+        axis.line = element_line(colour = "black"),
+        axis.text.x=element_blank())  
+
+p2 = ggplot(Clientes, aes(x=1:nrow(Clientes), y = (PorcentagemAcumulada))) + 
+  scale_x_discrete(labels=Clientes$Agricultor, breaks=1:nrow(Clientes),limits=1:nrow(Clientes))+
+  geom_line(aes(group=1)) + geom_point() +
+  ylab("Porcentagem") + 
+  xlab("Cliente")+
+  theme_bw()+
+  ylim(0, 100)+
+  theme(plot.margin = unit(c(-8, 1, 10, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x = element_text(angle = 0,face = "bold.italic", size = 12, vjust=-0.5),
+        axis.text.x = element_text(angle = 90, vjust = 0, size = 10),
+        plot.title = element_text(size = rel(1.5), face = "bold", vjust = 2),
+        axis.line = element_line(colour = "black"),
+        axis.text = element_text(colour = "black"))
+   
+gp1<- ggplot_gtable(ggplot_build(p1))
+gp2<- ggplot_gtable(ggplot_build(p2))
+maxWidth = unit.pmax(gp1$widths[2:3], gp2$widths[2:3])
+gp1$widths[2:3] <- maxWidth
+gp2$widths[2:3] <- maxWidth
+grid.arrange(gp1, gp2, heights = c(2/5, 3/5))
+
+
+```
+
+\pagebreak
+
+##Em canais que o Volume de vendas de sorgo ? baixo, os dois gr?ficos devem ser quase id?nticos.
+
+```{r, echo=FALSE,warning=FALSE, message=FALSE,cache.comments=FALSE,results = "asis"}
+#Mesma coisa que acima mas apenas com o volume de milho
+head_Clientes = head(Clientes_milho15,20)
+Clientes = head_Clientes
+Clientes$Agricultor = paste(substring(Clientes$Agricultor,1,10),  "...",sep="")
+
+p1 = ggplot(Clientes, aes(x=1:nrow(Clientes), y = (Volume))) +
+  scale_x_discrete(labels=Clientes$Agricultor, breaks=1:nrow(Clientes),limits=1:nrow(Clientes))+
+  geom_bar(stat="identity", colour = "black", fill="#3366FF") +
+  ylab("Sacos") + 
+  theme_bw()+
+  ylim(0, 1.2*max(Clientes$Volume))+
+  ggtitle("Principais Clientes Sementes - Milho") + 
+  theme(plot.margin = unit(c(10, 1, -10, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x=element_blank(),
+        plot.title = element_text(size = rel(1.5), face = "bold", vjust = 2),
+        axis.line = element_line(colour = "black"),
+        axis.text.x=element_blank())  
+
+p2 = ggplot(Clientes, aes(x=1:nrow(Clientes), y = (PorcentagemAcumulada))) + 
+  scale_x_discrete(labels=Clientes$Agricultor, breaks=1:nrow(Clientes),limits=1:nrow(Clientes))+
+  geom_line(aes(group=1)) + geom_point() +
+  ylab("Porcentagem") + 
+  xlab("Cliente")+
+  theme_bw()+
+  ylim(0, 100)+
+  theme(plot.margin = unit(c(-8, 1, 10, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x = element_text(angle = 0,face = "bold.italic", size = 12, vjust=-0.5),
+        axis.text.x = element_text(angle = 90, vjust = 0, size = 10),
+        plot.title = element_text(size = rel(1.5), face = "bold", vjust = 2),
+        axis.line = element_line(colour = "black"),
+        axis.text = element_text(colour = "black"))
+   
+gp1<- ggplot_gtable(ggplot_build(p1))
+gp2<- ggplot_gtable(ggplot_build(p2))
+maxWidth = unit.pmax(gp1$widths[2:3], gp2$widths[2:3])
+gp1$widths[2:3] <- maxWidth
+gp2$widths[2:3] <- maxWidth
+grid.arrange(gp1, gp2, heights = c(2/5, 3/5))
+
+
+refugio15$Cliente = gsub("[0-9]","",refugio15$Cliente)
+refugio15$Cliente = str_sub(refugio15$Cliente,2)
+
+
+tabela = xtable(refugio15,include.rownames=FALSE,digits =0)
+
+align(tabela) <- "|c|c|c|c|c|c|"
+
+print ((tabela),tabular.environment="longtable",include.rownames=FALSE, floating=FALSE,comment=F)
+```
+\pagebreak
+
+#Premissas do grafico de Produtos:
+
+1. Consideradas opera??es de Vendas, Devolu??o e Bonifica??o
+2. Todos os produtos
+3. Todas as cidades, independente da regional e distrito
+
+
+```{r, echo=FALSE,warning=FALSE, message=FALSE,cache.comments=FALSE}
+
+#Faz a impressao da tabela de principais produtos (em sacos)
+#Como o ggplot2 nao deixa fazer graficos de 2 eixos (devido a distor??o), 
+#? feito dessa forma, para mostra informa??o de forma parecida
+
+Produtos = head(Pivot15,15)
+
+p1 = ggplot(Produtos, aes(x = reorder(Produtos$Group.1, -Produtos$VolumeCanal), y = (VolumeCanal))) + 
+  geom_bar(stat="identity", colour = "black", fill="#3366FF") +
+  ylab("Sacos") + 
+  theme_bw()+
+  ylim(0, 1.2*max(Produtos$VolumeCanal))+
+  ggtitle("Principais Produtos Sementes") + 
+  theme(plot.margin = unit(c(10, 1, -10, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x=element_blank(),
+        plot.title = element_text(size = rel(1.5), face = "bold", vjust = 2),
+        axis.line = element_line(colour = "black"),
+        axis.text.x=element_blank())  
+
+p2 = ggplot(Produtos, aes(x = reorder(Produtos$Group.1, Produtos$PorcentagemAcumulada), y = (PorcentagemAcumulada))) + 
+  geom_line(aes(group=1)) + geom_point() +
+  ylab("Porcentagem") + 
+  xlab("Produto")+
+  theme_bw()+
+  ylim(0, 100)+
+  theme(plot.margin = unit(c(-8, 1, 10, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x = element_text(angle = 0,face = "bold.italic", size = 12, vjust=-0.5),
+        axis.text.x = element_text(angle = 90, vjust = 0, size = 10),
+        plot.title = element_text(size = rel(1.5), face = "bold", vjust = 2),
+        axis.line = element_line(colour = "black"),
+        axis.text = element_text(colour = "black"))
+   
+gp1<- ggplot_gtable(ggplot_build(p1))
+gp2<- ggplot_gtable(ggplot_build(p2))
+maxWidth = unit.pmax(gp1$widths[2:3], gp2$widths[2:3])
+gp1$widths[2:3] <- maxWidth
+gp2$widths[2:3] <- maxWidth
+grid.arrange(gp1, gp2, heights = c(2/5, 3/5))
+
+```
+\pagebreak
+
+
+
+#Principais Regionais de Atua??o:
+
+1. Consideradas opera??es de Vendas, Devolu??o e Bonifica??o
+2. Todas as vendas, independente da cidades, regional e distrito
+
+```{r, echo=FALSE,warning=FALSE, message=FALSE,cache.comments=FALSE, results = "asis", message=FALSE, comment=NA}
+#Principais Regionais que o distribuidor atuou
+#Como o ggplot2 nao deixa fazer graficos de 2 eixos (devido a distor??o), 
+#? feito dessa forma, para mostra informa??o de forma parecida
+
+p1 = ggplot(Regionais, aes(x=1:nrow(Regionais), y = (Volume))) +
+  scale_x_discrete(labels=Regionais$Regional,breaks=1:nrow(Regionais),limits=1:nrow(Regionais))+
+  geom_bar(stat="identity", colour = "black", fill="#3366FF") +
+  ylab("Sacos") + 
+  theme_bw()+
+  ylim(0, 1.2*max(Regionais$Volume))+
+  ggtitle("Principais Regionais Sementes") + 
+  theme(plot.margin = unit(c(10, 1, -10, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x=element_blank(),
+        plot.title = element_text(size = rel(1.5), face = "bold", vjust = 2),
+        axis.line = element_line(colour = "black"),
+        axis.text.x=element_blank())  
+
+p2 = ggplot(Regionais, aes(x=1:nrow(Regionais), y = (PorcentagemAcumulada))) + 
+  scale_x_discrete(labels=Regionais$Regional,breaks=1:nrow(Regionais),limits=1:nrow(Regionais))+
+  geom_line(aes(group=1)) + geom_point() +
+  ylab("Porcentagem") + 
+  xlab("Regional")+
+  theme_bw()+
+  ylim(0, 100)+
+  theme(plot.margin = unit(c(-8, 1, 10, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x = element_text(angle = 0,face = "bold.italic", size = 12, vjust=-0.5),
+        axis.text.x = element_text(angle = 90, vjust = 0, size = 10),
+        plot.title = element_text(size = rel(1.5), face = "bold", vjust = 2),
+        axis.line = element_line(colour = "black"),
+        axis.text = element_text(colour = "black"))
+   
+gp1<- ggplot_gtable(ggplot_build(p1))
+gp2<- ggplot_gtable(ggplot_build(p2))
+maxWidth = unit.pmax(gp1$widths[2:3], gp2$widths[2:3])
+gp1$widths[2:3] <- maxWidth
+gp2$widths[2:3] <- maxWidth
+grid.arrange(gp1, gp2, heights = c(2/5, 3/5))
+
+```
+
+\pagebreak
+
+#Premissas do c?lculo de MKT Share:
+
+1. Apenas Milho
+2. Opera??es de Vendas, Devolu??o e Bonifica??o
+3. Consideradas cidades onde houve volume maior que 5 sacos, independente a qual regional/distrito pertence a cidade ou distribuidor
+4. Cidades em que o distribuidor atuou s?o consideradas como seu mercado total
+
+```{r, echo=FALSE,warning=FALSE, message=FALSE,cache.comments=FALSE, results = "asis", message=FALSE, comment=NA}
+
+#Faz a impressao da tabela de mkt share
+
+
+mktshare15$MT_VENDAS = NULL
+mktshare15$QT_ACUMULADO = NULL
+mktshare15$PctAcumulado = NULL
+
+shares = c(mktshare13$share[length(mktshare13$share)],
+           mktshare14$share[length(mktshare14$share)],
+           mktshare15$share[length(mktshare15$share)])
+CY = c("CY 13/14","CY 14/15","CY 15/16")
+Shares = cbind.data.frame(CY,shares)
+Shares$shares = as.numeric(as.character(Shares$shares))
+
+p1 = ggplot(Shares, aes(x = CY, y = shares)) + 
+  geom_bar(stat="identity", colour = "black", fill = "#3366FF") +
+  ylab("Mkt Share") + 
+  theme_bw()+
+  geom_text(aes(label = paste(round(shares,2),"%",sep="")), vjust=-0.8,size = 2.7)+
+  ggtitle("Market Share 13/14 -> 15/16") + 
+  theme(plot.margin = unit(c(3, 1, 12, 1),units="points"),
+        axis.title.y = element_text(angle = 90,face = "bold.italic", size = 12),
+        axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 0, vjust = 0, size = 12),
+        axis.text.y = element_blank(),
+        plot.title = element_text(size = rel(1.3),face = "bold", vjust = 1),
+        axis.line = element_line(colour = "black"),
+        axis.text = element_text(colour = "black")) 
+print (p1)
+
+names(mktshare15)[2] = "Volume (Sacos)"
+names(mktshare15)[3] = "Area (ha)"
+names(mktshare15)[4] = "Share (%)"
+
+mktshare15$"Share (%)" = round(as.numeric(mktshare15$"Share (%)"),2)
+mktshare15$`Volume (Sacos)` = round(as.numeric(mktshare15$`Volume (Sacos)`),0)
+mktshare15$`Area (ha)` = round(as.numeric(mktshare15$`Area (ha)`),0)
+
+mktshare15$Municipios = lapply(mktshare15$Municipios,SGP::capwords)
+
+mktshare15$"Share (%)" = paste(as.character(mktshare15$"Share (%)"),"%",sep="")
+mktshare15$`Volume (Sacos)` = as.character(mktshare15$`Volume (Sacos)`)
+mktshare15$`Area (ha)` = as.character(mktshare15$`Area (ha)`)
+
+tabela = xtable(mktshare15,include.rownames=FALSE)
+
+align(tabela) <- "|c|c|c|c|c|"
+
+print ((tabela),tabular.environment="longtable",include.rownames=FALSE, floating=FALSE,comment=F)
+
+
+```
