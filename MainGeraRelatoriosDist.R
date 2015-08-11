@@ -54,7 +54,7 @@ unicos_qion = unique(qion_inicial$CODE_SAP_MATRIZ)
 
 
 #length(unicos_qion)
-for (i in 1:1){
+for (i in 1:length(unicos_qion)){
   
   #Chama as funcoes que v?o ser usadas
   source("funcoesDist.R")
@@ -63,7 +63,7 @@ for (i in 1:1){
   qion = qion_inicial
   matriz = unique(qion$CODE_SAP_MATRIZ)[i]
   #deixo essa linha para testes
-  matriz = 1832739 
+  #matriz = 1832739 
   
   #Filtra a matriz/distribuidor sendo usado
   qion = subset(qion, CODE_SAP_MATRIZ == matriz)
